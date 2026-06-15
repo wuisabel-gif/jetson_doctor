@@ -6,8 +6,26 @@
 
 ![Jetson Doctor HTML report — a desktop system-monitor window showing sensor telemetry and an overall WARN status](docs/screenshot.png)
 
-<sub>The generated HTML report, styled as a desktop system monitor. Reproduce it with
-`./build/jetson_doctor --demo --html` (representative sample data).</sub>
+<sub>The generated HTML report, styled as a desktop system monitor (the `warning`
+scenario). Reproduce it with `./build/jetson_doctor --demo --html`.</sub>
+
+### 🔴 Live demo
+
+**[View the interactive demo →](https://wuisabel-gif.github.io/jetson_doctor/)** — switch
+between four health scenarios to see how the report responds across the status spectrum:
+
+| Scenario | Overall | What it shows |
+|----------|---------|---------------|
+| `healthy`   | **PASS**    | Everything nominal |
+| `warning`   | **WARN**    | One metric over threshold (disk) |
+| `critical`  | **FAIL**    | Thermal / resource crisis with CPU throttling |
+| `nonjetson` | **UNKNOWN** | Generic Linux host with no thermal sensors |
+
+The same report in a failing state:
+
+![Jetson Doctor report in a critical state — red gauges, overall FAIL, CPU throttling](docs/screenshot-critical.png)
+
+<sub>Generate any scenario with `./build/jetson_doctor --demo <scenario> --html`.</sub>
 
 ## What it is
 
@@ -82,13 +100,15 @@ The binary is produced at `build/jetson_doctor`.
 ./build/jetson_doctor --json     # write logs/latest_report.json
 ./build/jetson_doctor --all      # terminal + HTML + JSON
 ./build/jetson_doctor --watch 2  # refresh terminal report every 2s
-./build/jetson_doctor --demo     # use representative sample data (docs/screenshots)
-./build/jetson_doctor --help     # usage
+./build/jetson_doctor --demo            # sample data (default: warning scenario)
+./build/jetson_doctor --demo critical   # sample data, specific scenario
+./build/jetson_doctor --help            # usage
 ```
 
-> `--demo` fills the report with representative healthy-Jetson values. It's how the
-> screenshot above is produced, and it's handy for demos on a non-Jetson machine where
-> the live sensors would read `UNKNOWN`.
+> `--demo [scenario]` fills the report with representative sample data instead of reading
+> live sensors. Scenarios: `healthy`, `warning`, `critical`, `nonjetson`. It's how the
+> screenshots and [live demo](https://wuisabel-gif.github.io/jetson_doctor/) are produced,
+> and it's handy for demos on a non-Jetson machine where live sensors read `UNKNOWN`.
 
 The process exit code mirrors overall health (`0` = PASS/UNKNOWN, `1` = WARN, `2` = FAIL),
 so it drops straight into CI pipelines and test scripts.
@@ -127,8 +147,10 @@ jetson-doctor/
 │   └── report_generator.hpp/.cpp # terminal / HTML / JSON rendering
 ├── reports/                    # generated HTML reports
 ├── logs/                       # generated JSON / CSV logs
-└── docs/
-    └── screenshot.png          # HTML report preview (used in this README)
+└── docs/                       # GitHub Pages site
+    ├── index.html              # interactive demo gallery (scenario tabs)
+    ├── healthy.html … nonjetson.html  # one generated report per scenario
+    └── screenshot*.png         # report previews used in this README
 ```
 
 The design separates **collection** (`SystemMonitor` produces `DiagnosticResult`s) from
