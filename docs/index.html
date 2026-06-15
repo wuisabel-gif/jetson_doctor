@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jetson Doctor — System Diagnostics</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --desktop:#06080c;--win:#0e1116;--chrome:#161b22;--side:#10141b;
+  --panel:#151a21;--inset:#0a0d12;--line:#232a35;--line-2:#1b212b;
+  --ink:#e9edf3;--mut:#9aa6b6;--dim:#69727f;--accent:#76b900;--r:11px;
+}
+html{color-scheme:dark}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,sans-serif;
+  background:var(--desktop);
+  background-image:radial-gradient(circle at 1px 1px,rgba(255,255,255,.025) 1px,transparent 0);
+  background-size:23px 23px;
+  color:var(--ink);min-height:100vh;display:flex;align-items:flex-start;
+  justify-content:center;padding:max(4vh,26px) 18px;-webkit-font-smoothing:antialiased;
+}
+.mono{font-family:ui-monospace,"SF Mono",SFMono-Regular,"JetBrains Mono",Menlo,Consolas,monospace;font-variant-numeric:tabular-nums}
+.win{
+  width:100%;max-width:940px;background:var(--win);
+  border:1px solid rgba(255,255,255,.07);border-radius:var(--r);overflow:hidden;
+  box-shadow:0 1px 0 rgba(255,255,255,.06) inset,0 42px 90px -28px rgba(0,0,0,.85),0 14px 32px -14px rgba(0,0,0,.6);
+  animation:winIn .5s cubic-bezier(.2,.8,.2,1) both;
+}
+@keyframes winIn{from{opacity:0;transform:translateY(12px) scale(.985)}to{opacity:1;transform:none}}
+.titlebar{display:flex;align-items:center;gap:14px;height:42px;padding:0 14px;
+  background:linear-gradient(#1c222c,#161b22);border-bottom:1px solid var(--line)}
+.lights{display:flex;gap:8px}
+.lt{width:12px;height:12px;border-radius:50%;border:1px solid rgba(0,0,0,.35)}
+.lt.r{background:#ff5f57}.lt.y{background:#febc2e}.lt.g{background:#28c840}
+.wtitle{flex:1;text-align:center;font-size:13px;font-weight:500;color:var(--mut)}
+.clock{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--mut)}
+.clock .live{width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent)}
+.toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:10px 16px;background:var(--chrome);border-bottom:1px solid var(--line)}
+.device{display:flex;align-items:center;gap:11px}
+.device .chip{display:flex;width:32px;height:32px;align-items:center;justify-content:center;
+  border-radius:8px;color:var(--accent);background:color-mix(in srgb,var(--accent) 13%,transparent);
+  border:1px solid color-mix(in srgb,var(--accent) 28%,transparent)}
+.device .dn{font-size:13.5px;font-weight:500;line-height:1.25}
+.device .dh{font-size:11.5px;color:var(--dim)}
+.run{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--mut);
+  text-transform:uppercase;letter-spacing:.09em}
+.run .pulse{width:7px;height:7px;border-radius:50%;background:var(--accent);animation:pulse 1.9s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 55%,transparent)}50%{opacity:.45;box-shadow:0 0 0 6px transparent}}
+.main{display:grid;grid-template-columns:250px 1fr}
+.side{background:var(--side);border-right:1px solid var(--line);padding:18px 16px;
+  display:flex;flex-direction:column;gap:16px}
+.ov{--c:#768390;border:1px solid color-mix(in srgb,var(--c) 38%,transparent);
+  background:color-mix(in srgb,var(--c) 9%,transparent);border-radius:10px;padding:14px 15px}
+.ov .lab{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--mut)}
+.ov .big{display:flex;align-items:center;gap:11px;margin-top:9px}
+.ov .led{width:13px;height:13px;border-radius:50%;background:var(--c);
+  box-shadow:0 0 13px color-mix(in srgb,var(--c) 80%,transparent)}
+.ov .st{font-size:25px;font-weight:500;color:var(--c)}
+.ov .desc{margin-top:8px;font-size:12px;color:var(--mut);line-height:1.5}
+.legend{display:flex;flex-direction:column;gap:1px}
+.lg{display:flex;align-items:center;justify-content:space-between;padding:7px 9px;border-radius:7px}
+.lg .k{display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--mut)}
+.lg .k i{width:8px;height:8px;border-radius:2px;display:block}
+.lg .v{font-size:13px;font-weight:500;color:var(--ink)}
+.skv{margin-top:auto;display:flex;flex-direction:column;gap:9px;
+  border-top:1px solid var(--line-2);padding-top:14px}
+.skv div{display:flex;justify-content:space-between;gap:12px;font-size:12px}
+.skv .k{color:var(--dim)}.skv .v{color:var(--mut);text-align:right;word-break:break-word}
+.content{padding:18px 20px 10px}
+.sect{display:flex;align-items:center;gap:11px;font-size:10.5px;letter-spacing:.13em;
+  text-transform:uppercase;color:var(--dim);margin:4px 2px 13px}
+.sect::after{content:"";flex:1;height:1px;background:var(--line-2)}
+.metrics{display:flex;flex-direction:column;margin-bottom:24px}
+.m{--c:#768390;display:grid;
+  grid-template-columns:34px minmax(120px,1fr) 150px 92px 78px;
+  align-items:center;gap:14px;padding:11px 10px;border-radius:8px;transition:background .15s}
+.m:not(:first-child){border-top:1px solid var(--line-2)}
+.m:hover{background:rgba(255,255,255,.025)}
+.mi{display:flex;align-items:center;justify-content:center;width:34px;height:34px;
+  border-radius:8px;color:var(--c);background:color-mix(in srgb,var(--c) 12%,transparent)}
+.mn{display:flex;flex-direction:column;gap:2px;min-width:0}
+.mt{font-size:14px;font-weight:500;color:var(--ink)}
+.md{font-size:12px;color:var(--mut);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mbar{height:6px;border-radius:999px;background:var(--inset);overflow:hidden;border:1px solid var(--line-2)}
+.mfill{display:block;height:100%;border-radius:999px;background:var(--c);
+  transition:width .9s cubic-bezier(.2,.8,.2,1)}
+.mv{justify-self:end;display:flex;align-items:baseline;gap:3px}
+.mv .num{font-size:18px;font-weight:500;color:var(--ink)}
+.mv .un{font-size:11.5px;color:var(--dim)}
+.mv .na{font-size:16px;color:var(--dim)}
+.pill{justify-self:end;font-size:10.5px;font-weight:500;letter-spacing:.05em;
+  padding:3px 9px;border-radius:6px;color:var(--c);
+  background:color-mix(in srgb,var(--c) 14%,transparent);
+  border:1px solid color-mix(in srgb,var(--c) 30%,transparent)}
+.info{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:1px;
+  background:var(--line-2);border:1px solid var(--line-2);border-radius:10px;
+  overflow:hidden;margin-bottom:18px}
+.iv{background:var(--panel);padding:12px 14px;display:flex;flex-direction:column;gap:4px}
+.iv .k{font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--dim)}
+.iv .v{font-size:13.5px;color:var(--ink);font-weight:500;word-break:break-word}
+.statusbar{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  flex-wrap:wrap;padding:9px 16px;background:var(--chrome);border-top:1px solid var(--line);
+  font-size:11.5px;color:var(--mut)}
+.sb-o{--c:#768390;display:flex;align-items:center;gap:8px;font-weight:500}
+.sb-o .led{width:9px;height:9px;border-radius:50%;background:var(--c);
+  box-shadow:0 0 8px color-mix(in srgb,var(--c) 80%,transparent)}
+.sb-mid{color:var(--dim)}
+@media (max-width:720px){
+  .main{grid-template-columns:1fr}
+  .side{border-right:none;border-bottom:1px solid var(--line)}
+  .skv{margin-top:6px}
+  .m{grid-template-columns:34px 1fr auto;gap:10px 12px;
+    grid-template-areas:"i n p" "i bar bar" "i v v"}
+  .mi{grid-area:i}.mn{grid-area:n}.mbar{grid-area:bar}
+  .mv{grid-area:v;justify-self:start}.pill{grid-area:p}
+}
+@media (prefers-reduced-motion:reduce){
+  .win{animation:none}.mfill{transition:none}.run .pulse{animation:none}
+}
+</style>
+</head>
+<body>
+<div class="win" role="application" aria-label="Jetson Doctor system diagnostics">
+<div class="titlebar">
+  <div class="lights"><span class="lt r"></span><span class="lt y"></span><span class="lt g"></span></div>
+  <div class="wtitle">Jetson Doctor — System Diagnostics</div>
+  <div class="clock"><span class="live"></span><span class="mono" id="clock">21:04:23</span></div>
+</div>
+<div class="toolbar">
+  <div class="device"><span class="chip"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="7" width="10" height="10" rx="1"/><path d="M10 10h4v4h-4z"/><path d="M9 3v2M15 3v2M9 19v2M15 19v2M3 9h2M3 15h2M19 9h2M19 15h2"/></svg></span><div><div class="dn">jetson-orin</div><div class="dh">NVIDIA Jetson · Tegra</div></div></div>
+  <div class="run"><span class="pulse"></span>monitoring</div>
+</div>
+<div class="main">
+<aside class="side">
+  <div class="ov" style="--c:#e3b341">
+    <div class="lab">Overall status</div>
+    <div class="big"><span class="led"></span><span class="st">WARN</span></div>
+    <div class="desc">1 check needs attention.</div>
+  </div>
+  <div class="legend">
+    <div class="lg"><span class="k"><i style="background:#56d364"></i>Pass</span><span class="v mono">9</span></div>
+    <div class="lg"><span class="k"><i style="background:#e3b341"></i>Warn</span><span class="v mono">1</span></div>
+    <div class="lg"><span class="k"><i style="background:#f85149"></i>Fail</span><span class="v mono">0</span></div>
+    <div class="lg"><span class="k"><i style="background:#768390"></i>Unknown</span><span class="v mono">0</span></div>
+  </div>
+  <div class="skv">
+    <div><span class="k">Host</span><span class="v">jetson-orin</span></div>
+    <div><span class="k">Platform</span><span class="v">NVIDIA Jetson · Tegra</span></div>
+  </div>
+</aside>
+<section class="content">
+  <div class="sect">Sensors &amp; telemetry</div>
+  <div class="metrics">
+    <div class="m" style="--c:#56d364">
+      <span class="mi"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13.5V5a2 2 0 1 1 4 0v8.5a4 4 0 1 1-4 0Z"/><path d="M12 16v-5"/></svg></span>
+      <div class="mn"><span class="mt">CPU Temperature</span><span class="md">CPU temperature is within normal range.</span></div>
+      <div class="mbar"><span class="mfill" data-fill="58.2" style="width:58.2%"></span></div>
+      <div class="mv"><span class="num mono">58.2</span><span class="un">C</span></div>
+      <span class="pill">PASS</span>
+    </div>
+    <div class="m" style="--c:#56d364">
+      <span class="mi"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13.5V5a2 2 0 1 1 4 0v8.5a4 4 0 1 1-4 0Z"/><path d="M12 16v-5"/></svg></span>
+      <div class="mn"><span class="mt">GPU Temperature</span><span class="md">GPU temperature is within normal range.</span></div>
+      <div class="mbar"><span class="mfill" data-fill="61.7" style="width:61.7%"></span></div>
+      <div class="mv"><span class="num mono">61.7</span><span class="un">C</span></div>
+      <span class="pill">PASS</span>
+    </div>
+    <div class="m" style="--c:#56d364">
+      <span class="mi"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="9" rx="1"/><path d="M7 16v2M11 16v2M15 16v2M19 16v2M8 11h2M14 11h2"/></svg></span>
+      <div class="mn"><span class="mt">Memory Usage</span><span class="md">Memory usage is within normal range.</span></div>
+      <div class="mbar"><span class="mfill" data-fill="43.0" style="width:43.0%"></span></div>
+      <div class="mv"><span class="num mono">43.0</span><span class="un">%</span></div>
+      <span class="pill">PASS</span>
+    </div>
+    <div class="m" style="--c:#e3b341">
+      <span class="mi"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg></span>
+      <div class="mn"><span class="mt">Disk Usage</span><span class="md">Disk usage is above recommended threshold.</span></div>
+      <div class="mbar"><span class="mfill" data-fill="84.0" style="width:84.0%"></span></div>
+      <div class="mv"><span class="num mono">84.0</span><span class="un">%</span></div>
+      <span class="pill">WARN</span>
+    </div>
+    <div class="m" style="--c:#56d364">
+      <span class="mi"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="7" width="10" height="10" rx="1"/><path d="M10 10h4v4h-4z"/><path d="M9 3v2M15 3v2M9 19v2M15 19v2M3 9h2M3 15h2M19 9h2M19 15h2"/></svg></span>
+      <div class="mn"><span class="mt">CPU Frequency</span><span class="md">CPU frequency reported successfully.</span></div>
+      <div class="mbar"><span class="mfill" data-fill="47.7" style="width:47.7%"></span></div>
+      <div class="mv"><span class="num mono">1.4</span><span class="un">GHz</span></div>
+      <span class="pill">PASS</span>
+    </div>
+  </div>
+  <div class="sect">System information</div>
+  <div class="info">
+    <div class="iv"><span class="k">Hostname</span><span class="v">jetson-orin</span></div>
+    <div class="iv"><span class="k">Operating System</span><span class="v">Ubuntu 22.04.3 LTS</span></div>
+    <div class="iv"><span class="k">Kernel</span><span class="v">Linux version 5.10.120-tegra</span></div>
+    <div class="iv"><span class="k">Uptime</span><span class="v">3d 7h 12m</span></div>
+    <div class="iv"><span class="k">Platform</span><span class="v">NVIDIA Jetson (Tegra) detected</span></div>
+  </div>
+</section>
+</div>
+<div class="statusbar">
+  <span class="sb-o" style="--c:#e3b341"><span class="led"></span>overall: WARN</span>
+  <span class="sb-mid mono">9 pass · 1 warn · 0 fail · 0 unknown</span>
+  <span>2026-06-14 21:04:23 · jetson_doctor v1.0</span>
+</div>
+</div>
+<script>
+(function(){
+  var c=document.getElementById('clock');
+  function tick(){var d=new Date();c.textContent=d.toLocaleTimeString([],{hour12:false});}
+  if(c){tick();setInterval(tick,1000);}
+  var reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(!reduce){
+    document.querySelectorAll('.mfill').forEach(function(f){
+      var target=f.getAttribute('data-fill');
+      f.style.width='0%';
+      requestAnimationFrame(function(){requestAnimationFrame(function(){f.style.width=target+'%';});});
+    });
+  }
+})();
+</script>
+</body>
+</html>
