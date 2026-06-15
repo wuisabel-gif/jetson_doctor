@@ -1,0 +1,14 @@
+# Build output
+build/
+cmake-build-*/
+
+# Generated reports / logs (keep the directories, ignore the contents)
+reports/*.html
+logs/*.json
+logs/*.csv
+
+# Editor / OS noise
+.DS_Store
+*.swp
+.vscode/
+.idea/
