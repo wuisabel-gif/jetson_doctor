@@ -271,8 +271,9 @@ body{
   background:var(--desktop);
   background-image:radial-gradient(circle at 1px 1px,rgba(255,255,255,.025) 1px,transparent 0);
   background-size:23px 23px;
-  color:var(--ink);min-height:100vh;display:flex;align-items:flex-start;
-  justify-content:center;padding:max(4vh,26px) 18px;-webkit-font-smoothing:antialiased;
+  color:var(--ink);min-height:100vh;display:flex;flex-direction:column;
+  align-items:center;justify-content:flex-start;padding:max(4vh,26px) 18px;
+  -webkit-font-smoothing:antialiased;
 }
 .mono{font-family:ui-monospace,"SF Mono",SFMono-Regular,"JetBrains Mono",Menlo,Consolas,monospace;font-variant-numeric:tabular-nums}
 .win{
@@ -493,6 +494,13 @@ body{
         << " unknown</span>\n"
         << "  <span>" << htmlEscape(ts) << " \xC2\xB7 jetson_doctor v1.0</span>\n"
         << "</div>\n</div>\n";  // close statusbar + win
+
+    // --- Footer (below the window, on the desktop backdrop) ---
+    out << R"FOOT(<footer style="width:100%;max-width:940px;margin:14px auto 0;padding:0 4px;display:flex;flex-wrap:wrap;gap:6px 16px;justify-content:space-between;align-items:center;font-size:12px;color:#69727f;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">
+  <span>&copy; 2026 wuisabel-gif &middot; All rights reserved</span>
+  <a href="https://github.com/wuisabel-gif" target="_blank" rel="noopener noreferrer" style="color:#76b900;text-decoration:none">github.com/wuisabel-gif</a>
+</footer>
+)FOOT";
 
     out << R"JS(<script>
 (function(){
