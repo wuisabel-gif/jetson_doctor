@@ -81,6 +81,15 @@ std::string htmlEscape(const std::string& s) {
     return out;
 }
 
+// Full-scale value for a gauge bar, chosen per unit so the fill is meaningful:
+// percentages run 0–100, temperatures 0–100 C, clock speed 0–3 GHz.
+double gaugeMax(const std::string& unit) {
+    if (unit == "%") return 100.0;
+    if (unit == "C") return 100.0;
+    if (unit == "GHz") return 3.0;
+    return 100.0;
+}
+
 // Escape a string for safe inclusion in JSON.
 std::string jsonEscape(const std::string& s) {
     std::string out;
@@ -159,52 +168,146 @@ void ReportGenerator::writeHtmlReport(
         << "<meta charset=\"utf-8\">\n"
         << "<meta name=\"viewport\" content=\"width=device-width, "
            "initial-scale=1\">\n"
-        << "<title>Jetson Doctor Diagnostic Report</title>\n"
+        << "<title>Jetson Doctor — Diagnostic Dashboard</title>\n"
         << "<style>\n"
-        << "  body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; "
-           "background:#0f1116; color:#e6e6e6; margin:0; padding:2rem; }\n"
-        << "  .card { max-width:840px; margin:0 auto; background:#1a1d24; "
-           "border-radius:12px; padding:2rem; box-shadow:0 8px 24px "
-           "rgba(0,0,0,.4); }\n"
-        << "  h1 { margin:0 0 .25rem; font-size:1.6rem; }\n"
-        << "  .sub { color:#9aa0a6; font-size:.9rem; margin-bottom:1.5rem; }\n"
-        << "  table { width:100%; border-collapse:collapse; }\n"
-        << "  th, td { text-align:left; padding:.6rem .75rem; "
-           "border-bottom:1px solid #2a2e37; }\n"
-        << "  th { color:#9aa0a6; font-weight:600; font-size:.8rem; "
-           "text-transform:uppercase; letter-spacing:.05em; }\n"
-        << "  .badge { display:inline-block; padding:.15rem .6rem; "
-           "border-radius:999px; color:#fff; font-weight:600; "
-           "font-size:.8rem; }\n"
-        << "  .overall { margin-top:1.5rem; font-size:1.15rem; "
-           "font-weight:700; }\n"
-        << "  .msg { color:#9aa0a6; font-size:.85rem; }\n"
-        << "</style>\n</head>\n<body>\n<div class=\"card\">\n";
+        << "  :root { --bg:#0d0f14; --panel:#161a22; --panel2:#1d2230;\n"
+        << "          --line:#2a2f3c; --text:#e8eaed; --muted:#9aa0a6;\n"
+        << "          --pass:#2e7d32; --warn:#ef6c00; --fail:#c62828;\n"
+        << "          --unknown:#5f6671; --accent:#76b900; }\n"  // NVIDIA green
+        << "  * { box-sizing:border-box; }\n"
+        << "  body { font-family:-apple-system,Segoe UI,Roboto,Helvetica,"
+           "sans-serif; background:var(--bg); color:var(--text); margin:0;\n"
+        << "         padding:2rem 1.25rem; }\n"
+        << "  .wrap { max-width:980px; margin:0 auto; }\n"
+        << "  header { display:flex; flex-wrap:wrap; align-items:center;\n"
+        << "           justify-content:space-between; gap:1rem; margin-bottom:1.5rem; }\n"
+        << "  .title { display:flex; align-items:center; gap:.7rem; }\n"
+        << "  .dot { width:.7rem; height:.7rem; border-radius:50%;\n"
+        << "         background:var(--accent); box-shadow:0 0 12px var(--accent); }\n"
+        << "  h1 { margin:0; font-size:1.45rem; letter-spacing:-.01em; }\n"
+        << "  .sub { color:var(--muted); font-size:.85rem; margin-top:.15rem; }\n"
+        << "  .overall-banner { display:flex; align-items:center; gap:.6rem;\n"
+        << "         padding:.6rem 1.1rem; border-radius:12px; font-weight:700;\n"
+        << "         font-size:1rem; color:#fff; }\n"
+        << "  .tiles { display:grid; grid-template-columns:repeat(4,1fr);\n"
+        << "         gap:.75rem; margin-bottom:1.5rem; }\n"
+        << "  .tile { background:var(--panel); border:1px solid var(--line);\n"
+        << "         border-radius:12px; padding:.9rem 1rem; }\n"
+        << "  .tile .n { font-size:1.6rem; font-weight:700; }\n"
+        << "  .tile .l { color:var(--muted); font-size:.75rem;\n"
+        << "         text-transform:uppercase; letter-spacing:.06em; }\n"
+        << "  .grid { display:grid; grid-template-columns:repeat(2,1fr);\n"
+        << "         gap:.85rem; margin-bottom:1.5rem; }\n"
+        << "  .metric { background:var(--panel); border:1px solid var(--line);\n"
+        << "         border-left:4px solid var(--unknown); border-radius:12px;\n"
+        << "         padding:1rem 1.1rem; }\n"
+        << "  .metric .row { display:flex; justify-content:space-between;\n"
+        << "         align-items:baseline; }\n"
+        << "  .metric .name { color:var(--muted); font-size:.85rem; }\n"
+        << "  .metric .val { font-size:1.5rem; font-weight:700; }\n"
+        << "  .metric .val .u { font-size:.9rem; color:var(--muted);\n"
+        << "         font-weight:500; margin-left:.15rem; }\n"
+        << "  .bar { height:7px; background:#0c0f15; border-radius:999px;\n"
+        << "         overflow:hidden; margin:.7rem 0 .55rem; }\n"
+        << "  .bar > span { display:block; height:100%; border-radius:999px; }\n"
+        << "  .msg { color:var(--muted); font-size:.8rem; }\n"
+        << "  .badge { display:inline-block; padding:.12rem .55rem;\n"
+        << "         border-radius:999px; color:#fff; font-weight:700;\n"
+        << "         font-size:.72rem; letter-spacing:.03em; }\n"
+        << "  .panel { background:var(--panel); border:1px solid var(--line);\n"
+        << "         border-radius:12px; padding:1.1rem 1.3rem; }\n"
+        << "  .panel h2 { margin:0 0 .8rem; font-size:.8rem; color:var(--muted);\n"
+        << "         text-transform:uppercase; letter-spacing:.06em; }\n"
+        << "  .info { display:grid; grid-template-columns:repeat(2,1fr);\n"
+        << "         gap:.5rem 1.5rem; }\n"
+        << "  .info .k { color:var(--muted); font-size:.85rem; }\n"
+        << "  .info .v { font-size:.9rem; font-weight:600; word-break:break-word; }\n"
+        << "  footer { color:var(--muted); font-size:.75rem; text-align:center;\n"
+        << "         margin-top:1.5rem; }\n"
+        << "  @media (max-width:640px){ .tiles{grid-template-columns:repeat(2,1fr);}\n"
+        << "         .grid,.info{grid-template-columns:1fr;} }\n"
+        << "</style>\n</head>\n<body>\n<div class=\"wrap\">\n";
 
-    out << "<h1>Jetson Doctor Diagnostic Report</h1>\n";
-    out << "<div class=\"sub\">Generated " << htmlEscape(nowTimestamp())
-        << "</div>\n";
-
-    out << "<table>\n<thead><tr>"
-        << "<th>Metric</th><th>Value</th><th>Status</th><th>Notes</th>"
-        << "</tr></thead>\n<tbody>\n";
-
+    // Split numeric (gauge) metrics from informational rows.
+    std::vector<const DiagnosticResult*> metrics, infos;
+    int nPass = 0, nWarn = 0, nFail = 0, nUnknown = 0;
     for (const auto& r : results) {
-        out << "<tr>"
-            << "<td>" << htmlEscape(r.name) << "</td>"
-            << "<td>" << htmlEscape(formatValue(r)) << "</td>"
-            << "<td><span class=\"badge\" style=\"background:"
-            << htmlColorFor(r.status) << "\">" << toString(r.status)
-            << "</span></td>"
-            << "<td class=\"msg\">" << htmlEscape(r.message) << "</td>"
-            << "</tr>\n";
+        if (r.hasValue) metrics.push_back(&r);
+        else infos.push_back(&r);
+        switch (r.status) {
+            case DiagnosticStatus::PASS:    ++nPass; break;
+            case DiagnosticStatus::WARN:    ++nWarn; break;
+            case DiagnosticStatus::FAIL:    ++nFail; break;
+            case DiagnosticStatus::UNKNOWN: ++nUnknown; break;
+        }
     }
 
-    out << "</tbody>\n</table>\n";
-    out << "<div class=\"overall\">Overall Status: "
-        << "<span class=\"badge\" style=\"background:"
-        << htmlColorFor(overall) << "\">" << toString(overall)
-        << "</span></div>\n";
+    // --- Header with overall-status banner ---
+    out << "<header>\n"
+        << "  <div class=\"title\"><span class=\"dot\"></span><div>\n"
+        << "    <h1>Jetson Doctor</h1>\n"
+        << "    <div class=\"sub\">Diagnostic Dashboard &middot; generated "
+        << htmlEscape(nowTimestamp()) << "</div>\n"
+        << "  </div></div>\n"
+        << "  <div class=\"overall-banner\" style=\"background:"
+        << htmlColorFor(overall) << "\">Overall: " << toString(overall)
+        << "</div>\n</header>\n";
+
+    // --- Summary tiles ---
+    out << "<div class=\"tiles\">\n";
+    auto tile = [&](int n, const char* label, const char* color) {
+        out << "  <div class=\"tile\"><div class=\"n\" style=\"color:" << color
+            << "\">" << n << "</div><div class=\"l\">" << label
+            << "</div></div>\n";
+    };
+    tile(nPass, "Pass", "var(--pass)");
+    tile(nWarn, "Warn", "var(--warn)");
+    tile(nFail, "Fail", "var(--fail)");
+    tile(nUnknown, "Unknown", "var(--unknown)");
+    out << "</div>\n";
+
+    // --- Metric gauge cards ---
+    out << "<div class=\"grid\">\n";
+    for (const auto* r : metrics) {
+        const char* color = htmlColorFor(r->status);
+        double fill = 0.0;
+        if (r->status != DiagnosticStatus::UNKNOWN) {
+            fill = (r->value / gaugeMax(r->unit)) * 100.0;
+            if (fill < 0) fill = 0;
+            if (fill > 100) fill = 100;
+        }
+        std::ostringstream valNum;
+        valNum << std::fixed << std::setprecision(1) << r->value;
+
+        out << "  <div class=\"metric\" style=\"border-left-color:" << color
+            << "\">\n"
+            << "    <div class=\"row\"><span class=\"name\">"
+            << htmlEscape(r->name) << "</span>"
+            << "<span class=\"badge\" style=\"background:" << color << "\">"
+            << toString(r->status) << "</span></div>\n"
+            << "    <div class=\"val\">" << valNum.str()
+            << "<span class=\"u\">" << htmlEscape(r->unit) << "</span></div>\n"
+            << "    <div class=\"bar\"><span style=\"width:" << fill
+            << "%;background:" << color << "\"></span></div>\n"
+            << "    <div class=\"msg\">" << htmlEscape(r->message) << "</div>\n"
+            << "  </div>\n";
+    }
+    out << "</div>\n";
+
+    // --- System information panel ---
+    if (!infos.empty()) {
+        out << "<div class=\"panel\">\n<h2>System Information</h2>\n"
+            << "<div class=\"info\">\n";
+        for (const auto* r : infos) {
+            out << "  <div class=\"k\">" << htmlEscape(r->name) << "</div>"
+                << "<div class=\"v\">" << htmlEscape(formatValue(*r))
+                << "</div>\n";
+        }
+        out << "</div>\n</div>\n";
+    }
+
+    out << "<footer>Jetson Doctor &middot; C++17 Linux hardware diagnostics "
+           "&middot; PASS / WARN / FAIL</footer>\n";
     out << "</div>\n</body>\n</html>\n";
 
     std::cout << "HTML report written to " << outputPath << "\n";
