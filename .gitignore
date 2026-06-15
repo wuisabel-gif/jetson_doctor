@@ -7,6 +7,9 @@ reports/*.html
 logs/*.json
 logs/*.csv
 
+# Build spec / agent prompt — kept local, not part of the deliverable
+AGENT.md
+
 # Editor / OS noise
 .DS_Store
 *.swp
