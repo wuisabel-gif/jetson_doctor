@@ -4,6 +4,11 @@
 > and compute health on NVIDIA Jetson platforms and generates PASS/WARN/FAIL reports for
 > bring-up, validation, and failure analysis.
 
+![Jetson Doctor HTML report — a desktop system-monitor window showing sensor telemetry and an overall WARN status](docs/screenshot.png)
+
+<sub>The generated HTML report, styled as a desktop system monitor. Reproduce it with
+`./build/jetson_doctor --demo --html` (representative sample data).</sub>
+
 ## What it is
 
 **Jetson Doctor** is a command-line hardware diagnostic monitor written in modern C++17.
@@ -77,13 +82,21 @@ The binary is produced at `build/jetson_doctor`.
 ./build/jetson_doctor --json     # write logs/latest_report.json
 ./build/jetson_doctor --all      # terminal + HTML + JSON
 ./build/jetson_doctor --watch 2  # refresh terminal report every 2s
+./build/jetson_doctor --demo     # use representative sample data (docs/screenshots)
 ./build/jetson_doctor --help     # usage
 ```
+
+> `--demo` fills the report with representative healthy-Jetson values. It's how the
+> screenshot above is produced, and it's handy for demos on a non-Jetson machine where
+> the live sensors would read `UNKNOWN`.
 
 The process exit code mirrors overall health (`0` = PASS/UNKNOWN, `1` = WARN, `2` = FAIL),
 so it drops straight into CI pipelines and test scripts.
 
 ### Example output
+
+The HTML report (see the [screenshot above](docs/screenshot.png)) is the human-facing
+surface. The same run also prints to the terminal:
 
 ```text
 Jetson Doctor Diagnostic Report
@@ -93,7 +106,7 @@ Jetson Doctor Diagnostic Report
 CPU Temperature:    58.2 C          PASS
 GPU Temperature:    61.7 C          PASS
 Memory Usage:       43.0 %          PASS
-Disk Usage:         72.0 %          WARN  — Disk usage is above recommended threshold.
+Disk Usage:         84.0 %          WARN  — Disk usage is above recommended threshold.
 CPU Frequency:      1.4 GHz         PASS
 
 Overall Status: WARN
@@ -115,6 +128,7 @@ jetson-doctor/
 ├── reports/                    # generated HTML reports
 ├── logs/                       # generated JSON / CSV logs
 └── docs/
+    └── screenshot.png          # HTML report preview (used in this README)
 ```
 
 The design separates **collection** (`SystemMonitor` produces `DiagnosticResult`s) from
