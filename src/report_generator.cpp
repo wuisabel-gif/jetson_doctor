@@ -227,7 +227,9 @@ void ReportGenerator::writeHtmlReport(
         }
         if (r.name == "Hostname" && !r.textValue.empty()) host = r.textValue;
         if (r.name == "Platform" && !r.textValue.empty()) {
-            jetson = r.textValue.find("Jetson") != std::string::npos;
+            // Match "NVIDIA Jetson" specifically — a plain "Jetson" search would
+            // also match the "(non-Jetson)" generic-Linux label.
+            jetson = r.textValue.find("NVIDIA Jetson") != std::string::npos;
             platform = jetson ? "NVIDIA Jetson \xC2\xB7 Tegra" : "Generic Linux";
         }
     }
